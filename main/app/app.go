@@ -9,6 +9,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mazurco066/playliter-api-go/domain/account"
 	"github.com/mazurco066/playliter-api-go/domain/auth"
+	"github.com/mazurco066/playliter-api-go/domain/band"
+	"github.com/mazurco066/playliter-api-go/domain/concert"
+	"github.com/mazurco066/playliter-api-go/domain/song"
 	"github.com/mazurco066/playliter-api-go/main/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -42,11 +45,17 @@ func Run() {
 		panic(dbErr)
 	}
 
-	// Db auto migrate according to schema
+	// Db auto migrate according to schemas
 	db.AutoMigrate(
 		&account.Account{},
 		&account.EmailVerification{},
 		&auth.Auth{},
+		&band.Band{},
+		&band.BandRequest{},
+		&band.Member{},
+		&concert.Concert{},
+		&concert.ConcertSong{},
+		&song.Song{},
 	)
 
 	// App routes

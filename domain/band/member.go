@@ -8,14 +8,14 @@ import (
 	"github.com/mazurco066/playliter-api-go/domain/account"
 )
 
-type BandRequest struct {
+type Member struct {
 	gorm.Model
-	ID        uint `gorm:"primaryKey"`
 	BandID    uint
 	Band      Band `gorm:"foreignKey:BandID"`
-	InvitedID uint
-	Invited   account.Account `gorm:"foreignKey:InvitedID"`
-	Status    string          // "pending", "accepted", "denied"
+	AccountID uint
+	Account   account.Account `gorm:"foreignKey:AccountID"`
+	Role      string
+	JoinedAt  time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
