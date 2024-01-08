@@ -16,6 +16,4 @@ type Member struct {
 	Account   account.Account `gorm:"foreignKey:AccountID"`
 	Role      string
 	JoinedAt  time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
 }
