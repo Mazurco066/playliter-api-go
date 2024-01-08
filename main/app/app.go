@@ -7,12 +7,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	accountrepo "github.com/mazurco066/playliter-api-go/data/repositories/account"
+	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
 	"github.com/mazurco066/playliter-api-go/domain/account"
 	"github.com/mazurco066/playliter-api-go/domain/auth"
 	"github.com/mazurco066/playliter-api-go/domain/band"
 	"github.com/mazurco066/playliter-api-go/domain/concert"
 	"github.com/mazurco066/playliter-api-go/domain/song"
 	"github.com/mazurco066/playliter-api-go/main/config"
+	accountcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/account"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -58,8 +61,24 @@ func Run() {
 		&song.Song{},
 	)
 
-	// App routes
+	/* ========= Setup common ========= */
+
+	/* ========= Setup infra ========= */
+
+	/* ========= Setup repositories ========= */
+	accountRepo := accountrepo.NewAccountRepo(db)
+
+	/* ========= Setup usecases ========= */
+	accountService := accountusecase.NewAccountUseCase(accountRepo)
+
+	/* ========= Setup controllers ========= */
+	accountController := accountcontroller.NewAccaccountController(accountService)
+
+	/* ========= Setup middlewares ========= */
+
+	/* ========= App routes ========= */
 	router.GET("/", HandleRoot)
+	router.GET("/login", accountController.Login)
 
 	// Starting Http server
 	host := fmt.Sprintf("%s:%s", configs.Host, configs.Port)
