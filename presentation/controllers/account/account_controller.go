@@ -9,6 +9,7 @@ import (
 
 type AccountController interface {
 	Login(*gin.Context)
+	Register(*gin.Context)
 }
 
 type accountController struct {
@@ -25,4 +26,8 @@ func NewAccaccountController(
 
 func (ctl *accountController) Login(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "login com sucesso"})
+}
+
+func (ctl *accountController) Register(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Registrado com sucesso"})
 }

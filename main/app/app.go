@@ -29,16 +29,16 @@ func HandleRoot(c *gin.Context) {
 }
 
 func Run() {
-	// Loads .env file
+	/* ========= Loads .env file ========= */
 	envErr := godotenv.Load()
 	if envErr != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// App enviroment values
+	/* ========= Enviroment values ========= */
 	configs := config.GetConfig()
 
-	// Postgres connection
+	/* ========= Postgres connection ========= */
 	dci := config.GetPostgresConfig().GetPostgresConnectionInfo()
 	db, dbErr := gorm.Open(
 		postgres.Open(dci),
@@ -48,7 +48,7 @@ func Run() {
 		panic(dbErr)
 	}
 
-	// Db auto migrate according to schemas
+	/* ========= Database auto migration (schemas) ========= */
 	db.AutoMigrate(
 		&account.Account{},
 		&account.EmailVerification{},
@@ -79,8 +79,9 @@ func Run() {
 	/* ========= App routes ========= */
 	router.GET("/", HandleRoot)
 	router.GET("/login", accountController.Login)
+	router.GET("/register", accountController.Register)
 
-	// Starting Http server
+	/* ========= Server start ========= */
 	host := fmt.Sprintf("%s:%s", configs.Host, configs.Port)
 	router.Run(host)
 }
