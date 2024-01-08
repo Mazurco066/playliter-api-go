@@ -1,0 +1,13 @@
+# Envs
+db-data
+*.env
+.DS_Store
+
+# Log
+*.log
+.debug
+tmp
+
+# IDE
+.vscode
+.idea
