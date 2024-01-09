@@ -6,6 +6,7 @@ import (
 )
 
 type Repo interface {
+	Create(*account.Account) error
 	FindByUsernameOrEmail(filter string) (*account.Account, error)
 }
 
@@ -17,6 +18,10 @@ func NewAccountRepo(db *gorm.DB) Repo {
 	return &AccountRepo{
 		db: db,
 	}
+}
+
+func (repo *AccountRepo) Create(account *account.Account) error {
+	return repo.db.Create(account).Error
 }
 
 func (repo *AccountRepo) FindByUsernameOrEmail(filter string) (*account.Account, error) {

@@ -75,11 +75,13 @@ func Run() {
 	accountController := accountcontroller.NewAccaccountController(accountService)
 
 	/* ========= Setup middlewares ========= */
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
 
 	/* ========= App routes ========= */
 	router.GET("/", HandleRoot)
 	router.GET("/login", accountController.Login)
-	router.GET("/register", accountController.Register)
+	router.POST("/register", accountController.Register)
 
 	/* ========= Server start ========= */
 	host := fmt.Sprintf("%s:%s", configs.Host, configs.Port)
