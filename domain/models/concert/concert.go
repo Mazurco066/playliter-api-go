@@ -5,8 +5,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/mazurco066/playliter-api-go/domain/band"
-	"github.com/mazurco066/playliter-api-go/domain/song"
+	"github.com/mazurco066/playliter-api-go/domain/models/band"
+	"github.com/mazurco066/playliter-api-go/domain/models/song"
 )
 
 type Concert struct {

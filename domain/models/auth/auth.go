@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/mazurco066/playliter-api-go/domain/account"
+	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	"gorm.io/gorm"
 )
 

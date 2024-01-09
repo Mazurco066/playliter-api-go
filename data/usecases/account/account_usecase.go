@@ -2,7 +2,7 @@ package accountusecase
 
 import (
 	accountrepo "github.com/mazurco066/playliter-api-go/data/repositories/account"
-	"github.com/mazurco066/playliter-api-go/domain/account"
+	"github.com/mazurco066/playliter-api-go/domain/models/account"
 )
 
 type AccountUseCase interface {

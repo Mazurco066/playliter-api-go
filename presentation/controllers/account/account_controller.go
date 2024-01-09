@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
-	"github.com/mazurco066/playliter-api-go/domain/account"
+	accountinputs "github.com/mazurco066/playliter-api-go/domain/inputs/account"
+	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	"github.com/mazurco066/playliter-api-go/presentation/helpers"
-	accountinputs "github.com/mazurco066/playliter-api-go/presentation/inputs/account"
 )
 
 type AccountController interface {

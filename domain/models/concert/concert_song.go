@@ -3,7 +3,7 @@ package concert
 import (
 	"gorm.io/gorm"
 
-	"github.com/mazurco066/playliter-api-go/domain/song"
+	"github.com/mazurco066/playliter-api-go/domain/models/song"
 )
 
 type ConcertSong struct {

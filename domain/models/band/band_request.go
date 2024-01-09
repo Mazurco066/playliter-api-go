@@ -3,7 +3,7 @@ package band
 import (
 	"gorm.io/gorm"
 
-	"github.com/mazurco066/playliter-api-go/domain/account"
+	"github.com/mazurco066/playliter-api-go/domain/models/account"
 )
 
 type BandRequest struct {
