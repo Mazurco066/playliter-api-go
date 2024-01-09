@@ -7,8 +7,8 @@ import (
 
 type Auth struct {
 	gorm.Model
-	Token              string
-	ResetPasswordToken *string
-	AccountID          uint
-	Account            account.Account `gorm:"foreignKey:AccountID"`
+	Token              string          `json:"token"`
+	ResetPasswordToken *string         `json:"reset_password_token"`
+	AccountID          uint            `json:"account_id"`
+	Account            account.Account `gorm:"foreignKey:AccountID" json:"account"`
 }

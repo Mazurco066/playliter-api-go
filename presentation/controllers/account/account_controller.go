@@ -28,10 +28,46 @@ func NewAccaccountController(
 	}
 }
 
+// @Summary Login into your application account
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /login [post]
 func (ctl *accountController) Login(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "login com sucesso"})
+	var loginInput accountinputs.LoginInput
+	if err := c.BindJSON(&loginInput); err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	validate := validator.New()
+	if validationErr := validate.Struct(loginInput); validationErr != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", validationErr.Error())
+		return
+	}
+
+	account, err := ctl.AccountUC.GetAccountByUsernameOrEmail(loginInput.UsernameOrEmail)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
+
+	err = ctl.AccountUC.ComparePassword(loginInput.Password, account.Password)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
+
+	helpers.HTTPRes(c, http.StatusOK, "Successfully logged in!", nil)
 }
 
+// @Summary Register a new user account
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /register [post]
 func (ctl *accountController) Register(c *gin.Context) {
 	var newAccount accountinputs.RegisterInput
 	if err := c.BindJSON(&newAccount); err != nil {

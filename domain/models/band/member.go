@@ -10,10 +10,10 @@ import (
 
 type Member struct {
 	gorm.Model
-	BandID    uint
-	Band      Band `gorm:"foreignKey:BandID"`
-	AccountID uint
-	Account   account.Account `gorm:"foreignKey:AccountID"`
-	Role      string
-	JoinedAt  time.Time
+	BandID    uint            `json:"band_id"`
+	Band      Band            `gorm:"foreignKey:BandID" json:"band"`
+	AccountID uint            `json:"account_id"`
+	Account   account.Account `gorm:"foreignKey:AccountID" json:"account"`
+	Role      string          `json:"role"`
+	JoinedAt  time.Time       `json:"joined_at"`
 }

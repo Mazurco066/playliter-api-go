@@ -6,3 +6,8 @@ type RegisterInput struct {
 	Name     string `json:"name" validate:"required"`
 	Password string `json:"password" validate:"required,min=8"`
 }
+
+type LoginInput struct {
+	UsernameOrEmail string `json:"username_or_email" validate:"required,min=8"`
+	Password        string `json:"password" validate:"required,min=8"`
+}

@@ -11,10 +11,10 @@ import (
 
 type Concert struct {
 	gorm.Model
-	Title       string
-	Description string
-	Date        time.Time
-	BandID      uint
-	Band        band.Band   `gorm:"foreignKey:BandID"`
-	Songs       []song.Song `gorm:"many2many:concert_songs;"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Date        time.Time   `json:"date"`
+	BandID      uint        `json:"band_id"`
+	Band        band.Band   `gorm:"foreignKey:BandID" json:"band"`
+	Songs       []song.Song `gorm:"many2many:concert_songs;" json:"songs"`
 }

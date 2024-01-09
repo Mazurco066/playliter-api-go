@@ -8,9 +8,9 @@ import (
 
 type BandRequest struct {
 	gorm.Model
-	BandID    uint
-	Band      Band `gorm:"foreignKey:BandID"`
-	InvitedID uint
-	Invited   account.Account `gorm:"foreignKey:InvitedID"`
-	Status    string          // "pending", "accepted", "denied"
+	BandID    uint            `json:"band_id"`
+	Band      Band            `gorm:"foreignKey:BandID" json:"band"`
+	InvitedID uint            `json:"invited_id"`
+	Invited   account.Account `gorm:"foreignKey:InvitedID" json:"invited"`
+	Status    string          `json:"status"` // "pending", "accepted", "denied"
 }

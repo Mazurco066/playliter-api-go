@@ -14,6 +14,7 @@ import (
 	"github.com/mazurco066/playliter-api-go/domain/models/band"
 	"github.com/mazurco066/playliter-api-go/domain/models/concert"
 	"github.com/mazurco066/playliter-api-go/domain/models/song"
+	"github.com/mazurco066/playliter-api-go/infra/hmachash"
 	"github.com/mazurco066/playliter-api-go/main/config"
 	accountcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/account"
 	"gorm.io/driver/postgres"
@@ -62,6 +63,7 @@ func Run() {
 	)
 
 	/* ========= Setup common ========= */
+	hm := hmachash.NewHMAC(configs.HMACKey)
 
 	/* ========= Setup infra ========= */
 
@@ -69,7 +71,7 @@ func Run() {
 	accountRepo := accountrepo.NewAccountRepo(db)
 
 	/* ========= Setup usecases ========= */
-	accountService := accountusecase.NewAccountUseCase(accountRepo)
+	accountService := accountusecase.NewAccountUseCase(accountRepo, hm)
 
 	/* ========= Setup controllers ========= */
 	accountController := accountcontroller.NewAccaccountController(accountService)
@@ -80,7 +82,7 @@ func Run() {
 
 	/* ========= App routes ========= */
 	router.GET("/", HandleRoot)
-	router.GET("/login", accountController.Login)
+	router.POST("/login", accountController.Login)
 	router.POST("/register", accountController.Register)
 
 	/* ========= Server start ========= */

@@ -11,7 +11,7 @@ type Response struct {
 }
 
 func HTTPRes(c *gin.Context, httpCode int, msg string, data interface{}) {
-	c.JSON(httpCode, Response{
+	c.IndentedJSON(httpCode, Response{
 		Code: httpCode,
 		Msg:  msg,
 		Data: data,

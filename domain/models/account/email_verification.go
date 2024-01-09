@@ -6,7 +6,7 @@ import (
 
 type EmailVerification struct {
 	gorm.Model
-	Code      string
-	AccountID uint
-	Account   Account `gorm:"foreignKey:AccountID"`
+	Code      string  `json:"code"`
+	AccountID uint    `json:"account_id"`
+	Account   Account `gorm:"foreignKey:AccountID" json:"account"`
 }

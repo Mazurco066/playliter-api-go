@@ -1,8 +1,6 @@
 package song
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 
 	"github.com/mazurco066/playliter-api-go/domain/models/band"
@@ -10,15 +8,12 @@ import (
 
 type Song struct {
 	gorm.Model
-	ID          uint `gorm:"primaryKey"`
-	Title       string
-	Writter     string
-	Tone        string
-	Body        string
-	EmbeddedUrl *string
-	Category    *string
-	BandID      uint
-	Band        band.Band `gorm:"foreignKey:BandID"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	Title       string    `json:"title"`
+	Writter     string    `json:"writter"`
+	Tone        string    `json:"tone"`
+	Body        string    `json:"body"`
+	EmbeddedUrl *string   `json:"embedded_url"`
+	Category    *string   `json:"category"`
+	BandID      uint      `json:"band_id"`
+	Band        band.Band `gorm:"foreignKey:BandID" json:"band"`
 }
