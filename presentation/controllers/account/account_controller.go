@@ -6,8 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
+	authusecase "github.com/mazurco066/playliter-api-go/data/usecases/auth"
 	accountinputs "github.com/mazurco066/playliter-api-go/domain/inputs/account"
 	"github.com/mazurco066/playliter-api-go/domain/models/account"
+	accountoutputs "github.com/mazurco066/playliter-api-go/domain/outputs/account"
 	"github.com/mazurco066/playliter-api-go/presentation/helpers"
 )
 
@@ -18,13 +20,16 @@ type AccountController interface {
 
 type accountController struct {
 	AccountUC accountusecase.AccountUseCase
+	AuthUc    authusecase.AuthUseCase
 }
 
 func NewAccaccountController(
 	accountUC accountusecase.AccountUseCase,
+	authUc authusecase.AuthUseCase,
 ) AccountController {
 	return &accountController{
 		AccountUC: accountUC,
+		AuthUc:    authUc,
 	}
 }
 
@@ -59,7 +64,11 @@ func (ctl *accountController) Login(c *gin.Context) {
 		return
 	}
 
-	helpers.HTTPRes(c, http.StatusOK, "Successfully logged in!", nil)
+	err = ctl.login(c, account)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
 }
 
 // @Summary Register a new user account
@@ -93,6 +102,32 @@ func (ctl *accountController) Register(c *gin.Context) {
 		return
 	}
 
-	helpers.HTTPRes(c, http.StatusCreated, "Account successfully created!", account)
-	return
+	err := ctl.login(c, &account)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
+}
+
+// Map user struct aux function
+func (ctl *accountController) mapToUserOutput(a *account.Account) *accountoutputs.AccountOutput {
+	return &accountoutputs.AccountOutput{
+		ID:       a.ID,
+		Email:    a.Email,
+		Name:     a.Name,
+		Role:     a.Role,
+		IsActive: a.IsActive,
+	}
+}
+
+// Login aux function
+func (ctl *accountController) login(c *gin.Context, a *account.Account) error {
+	token, err := ctl.AuthUc.IssueToken(*a)
+	if err != nil {
+		return err
+	}
+	userOutput := ctl.mapToUserOutput(a)
+	out := gin.H{"token": token, "user": userOutput}
+	helpers.HTTPRes(c, http.StatusOK, "Successfully logged in!", out)
+	return nil
 }

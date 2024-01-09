@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	accountrepo "github.com/mazurco066/playliter-api-go/data/repositories/account"
 	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
+	authusecase "github.com/mazurco066/playliter-api-go/data/usecases/auth"
 	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	"github.com/mazurco066/playliter-api-go/domain/models/auth"
 	"github.com/mazurco066/playliter-api-go/domain/models/band"
@@ -72,9 +73,10 @@ func Run() {
 
 	/* ========= Setup usecases ========= */
 	accountService := accountusecase.NewAccountUseCase(accountRepo, hm)
+	authService := authusecase.NewAuthUseCase(configs.JWTSecret)
 
 	/* ========= Setup controllers ========= */
-	accountController := accountcontroller.NewAccaccountController(accountService)
+	accountController := accountcontroller.NewAccaccountController(accountService, authService)
 
 	/* ========= Setup middlewares ========= */
 	router.Use(gin.Logger())
