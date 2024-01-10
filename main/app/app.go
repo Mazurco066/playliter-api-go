@@ -8,8 +8,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	accountrepo "github.com/mazurco066/playliter-api-go/data/repositories/account"
+	bandrepo "github.com/mazurco066/playliter-api-go/data/repositories/band"
+	concertrepo "github.com/mazurco066/playliter-api-go/data/repositories/concert"
+	songrepo "github.com/mazurco066/playliter-api-go/data/repositories/song"
 	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
 	authusecase "github.com/mazurco066/playliter-api-go/data/usecases/auth"
+	bandusecase "github.com/mazurco066/playliter-api-go/data/usecases/band"
+	concertusecase "github.com/mazurco066/playliter-api-go/data/usecases/concert"
+	songusecase "github.com/mazurco066/playliter-api-go/data/usecases/song"
 	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	"github.com/mazurco066/playliter-api-go/domain/models/auth"
 	"github.com/mazurco066/playliter-api-go/domain/models/band"
@@ -19,6 +25,9 @@ import (
 	"github.com/mazurco066/playliter-api-go/infra/middlewares"
 	"github.com/mazurco066/playliter-api-go/main/config"
 	accountcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/account"
+	bandcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/band"
+	concertcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/concert"
+	songcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/song"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -71,13 +80,22 @@ func Run() {
 
 	/* ========= Setup repositories ========= */
 	accountRepo := accountrepo.NewAccountRepo(db)
+	bandRepo := bandrepo.NewBandRepo(db)
+	concertRepo := concertrepo.NewConcertRepo(db)
+	songrepo := songrepo.NewSongRepo(db)
 
 	/* ========= Setup usecases ========= */
 	accountService := accountusecase.NewAccountUseCase(accountRepo, hm)
 	authService := authusecase.NewAuthUseCase(configs.JWTSecret)
+	bandService := bandusecase.NewBandUseCase(bandRepo)
+	concertService := concertusecase.NewConcertUseCase(concertRepo)
+	songService := songusecase.NewSongUseCase(songrepo)
 
 	/* ========= Setup controllers ========= */
 	accountController := accountcontroller.NewAccaccountController(accountService, authService)
+	bandcontroller := bandcontroller.NewBandController(bandService)
+	concertController := concertcontroller.NewConcertController(concertService)
+	songController := songcontroller.NewSongController(songService)
 
 	/* ========= Setup middlewares ========= */
 	router.Use(gin.Logger())
@@ -88,9 +106,9 @@ func Run() {
 	api.GET("/", HandleRoot)
 	api.POST("/login", accountController.Login)
 	api.POST("/register", accountController.Register)
-	accounts := api.Group("/accounts")
 
 	/* ========= App account routes ========= */
+	accounts := api.Group("/accounts")
 	accounts.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
 	{
 		accounts.GET("/me", accountController.CurrentAccount)
@@ -99,10 +117,25 @@ func Run() {
 	}
 
 	/* ========= App band routes ========= */
+	bands := api.Group("/bands")
+	bands.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
+	{
+		bands.POST("/", bandcontroller.Create)
+	}
 
 	/* ========= App concert routes ========= */
+	concerts := api.Group("/concerts")
+	concerts.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
+	{
+		concerts.POST("/", concertController.Create)
+	}
 
 	/* ========= App song routes ========= */
+	songs := api.Group("/songs")
+	songs.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
+	{
+		songs.POST("/", songController.Create)
+	}
 
 	/* ========= Server start ========= */
 	host := fmt.Sprintf("%s:%s", configs.Host, configs.Port)
