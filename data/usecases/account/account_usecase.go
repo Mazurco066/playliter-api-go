@@ -15,6 +15,7 @@ type AccountUseCase interface {
 	GetAccountByUsernameOrEmail(filter string) (*account.Account, error)
 	HashPassword(rawPassword string) (string, error)
 	ListActiveAccounts(*account.Account, *commoninputs.PagingParams) ([]*account.Account, error)
+	Update(*account.Account, bool) error
 }
 
 type accountUseCase struct {
@@ -74,4 +75,15 @@ func (uc *accountUseCase) HashPassword(rawPassword string) (string, error) {
 
 func (uc *accountUseCase) ListActiveAccounts(account *account.Account, paging *commoninputs.PagingParams) ([]*account.Account, error) {
 	return uc.Repo.FindActiveAccounts(account, paging)
+}
+
+func (uc *accountUseCase) Update(account *account.Account, hashPassword bool) error {
+	if hashPassword {
+		hashedPass, err := uc.HashPassword(account.Password)
+		if err != nil {
+			return err
+		}
+		account.Password = hashedPass
+	}
+	return uc.Repo.Update(account)
 }

@@ -94,6 +94,7 @@ func Run() {
 	accounts.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
 	{
 		accounts.GET("/me", accountController.CurrentAccount)
+		accounts.PATCH("/me", accountController.Update)
 		accounts.GET("/active_users", accountController.ListActiveAccounts)
 	}
 

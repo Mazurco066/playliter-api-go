@@ -19,6 +19,7 @@ type AccountController interface {
 	ListActiveAccounts(*gin.Context)
 	Login(*gin.Context)
 	Register(*gin.Context)
+	Update(*gin.Context)
 }
 
 type accountController struct {
@@ -166,11 +167,98 @@ func (ctl *accountController) Register(c *gin.Context) {
 		return
 	}
 
+	// Todo: Implement a mailer referencing sendgrid to send confirmation E-mail
+
 	err := ctl.login(c, &account)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
+}
+
+// @Summary Update account data
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/accounts/me [patch]
+func (ctl *accountController) Update(c *gin.Context) {
+	account := ctl.validateTokenData(c)
+	if account == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	var newAccountData accountinputs.UpdateInput
+	if err := c.BindJSON(&newAccountData); err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	validate := validator.New()
+	if validationErr := validate.Struct(newAccountData); validationErr != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", validationErr.Error())
+		return
+	}
+
+	if newAccountData.Password != "" && newAccountData.Password != newAccountData.ConfirmPassword {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Password and Confirm passwords must match", nil)
+		return
+	}
+
+	if newAccountData.Password != "" && newAccountData.OldPassword == "" {
+		helpers.HTTPRes(c, http.StatusBadRequest, "You must fill your old password if you want to update your password", nil)
+		return
+	}
+
+	// In this section if the user changes his email it will need an additional validation agrain
+	canSendConfirmationEmail := false
+	if newAccountData.Email != "" && newAccountData.Email != account.Email {
+		account.Email = newAccountData.Email
+		account.IsEmailValid = false
+		canSendConfirmationEmail = true
+	}
+
+	// In this section if user wants to update his password the old password must match current one
+	hashPasswd := false
+	if newAccountData.Password != "" {
+		err := ctl.AccountUC.ComparePassword(newAccountData.OldPassword, account.Password)
+		if err != nil {
+			helpers.HTTPRes(c, http.StatusBadRequest, "Old password is incorrect! Try again.", nil)
+			return
+		}
+		account.Password = newAccountData.Password
+		hashPasswd = true
+	}
+
+	if newAccountData.Name != "" {
+		account.Name = newAccountData.Name
+	}
+	if newAccountData.Avatar != "" {
+		account.Avatar = &newAccountData.Avatar
+	}
+
+	if persistErr := ctl.AccountUC.Update(account, hashPasswd); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting account!", persistErr.Error())
+		return
+	}
+
+	// Before returning to the user send a confirmation E-mail if the email field was updated
+	if canSendConfirmationEmail {
+		// Todo: Implement mailer (sendgrid)
+
+		// As user updated his email that corresponds to his token key it will be necessary a new token
+		err := ctl.login(c, account)
+		if err != nil {
+			helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+	}
+
+	// As the user didn't updated his email a new token will not be required
+	outputUser := ctl.mapToUserOutput(account)
+	out := gin.H{"token": nil, "user": outputUser}
+	helpers.HTTPRes(c, http.StatusOK, "Account successfully updated!", out)
 }
 
 /* =========== PRIVATE METHODS =========== */

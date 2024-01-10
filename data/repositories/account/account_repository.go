@@ -11,6 +11,7 @@ type Repo interface {
 	FindActiveAccounts(*account.Account, *commoninputs.PagingParams) ([]*account.Account, error)
 	FindByUserEmail(email string) (*account.Account, error)
 	FindByUsernameOrEmail(filter string) (*account.Account, error)
+	Update(*account.Account) error
 }
 
 type AccountRepo struct {
@@ -55,4 +56,8 @@ func (repo *AccountRepo) FindByUsernameOrEmail(filter string) (*account.Account,
 		return nil, err
 	}
 	return &account, nil
+}
+
+func (repo *AccountRepo) Update(acount *account.Account) error {
+	return repo.db.Save(acount).Error
 }
