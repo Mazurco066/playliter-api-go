@@ -16,6 +16,7 @@ import (
 	"github.com/mazurco066/playliter-api-go/domain/models/concert"
 	"github.com/mazurco066/playliter-api-go/domain/models/song"
 	"github.com/mazurco066/playliter-api-go/infra/hmachash"
+	"github.com/mazurco066/playliter-api-go/infra/middlewares"
 	"github.com/mazurco066/playliter-api-go/main/config"
 	accountcontroller "github.com/mazurco066/playliter-api-go/presentation/controllers/account"
 	"gorm.io/driver/postgres"
@@ -82,10 +83,25 @@ func Run() {
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 
-	/* ========= App routes ========= */
-	router.GET("/", HandleRoot)
-	router.POST("/login", accountController.Login)
-	router.POST("/register", accountController.Register)
+	/* ========= App default routes ========= */
+	api := router.Group("/api")
+	api.GET("/", HandleRoot)
+	api.POST("/login", accountController.Login)
+	api.POST("/register", accountController.Register)
+	accounts := api.Group("/accounts")
+
+	/* ========= App account routes ========= */
+	accounts.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
+	{
+		accounts.GET("/me", accountController.CurrentAccount)
+		accounts.GET("/active_users", accountController.ListActiveAccounts)
+	}
+
+	/* ========= App band routes ========= */
+
+	/* ========= App concert routes ========= */
+
+	/* ========= App song routes ========= */
 
 	/* ========= Server start ========= */
 	host := fmt.Sprintf("%s:%s", configs.Host, configs.Port)

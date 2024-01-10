@@ -8,12 +8,15 @@ import (
 	accountusecase "github.com/mazurco066/playliter-api-go/data/usecases/account"
 	authusecase "github.com/mazurco066/playliter-api-go/data/usecases/auth"
 	accountinputs "github.com/mazurco066/playliter-api-go/domain/inputs/account"
+	commoninputs "github.com/mazurco066/playliter-api-go/domain/inputs/common"
 	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	accountoutputs "github.com/mazurco066/playliter-api-go/domain/outputs/account"
 	"github.com/mazurco066/playliter-api-go/presentation/helpers"
 )
 
 type AccountController interface {
+	CurrentAccount(*gin.Context)
+	ListActiveAccounts(*gin.Context)
 	Login(*gin.Context)
 	Register(*gin.Context)
 }
@@ -33,12 +36,73 @@ func NewAccaccountController(
 	}
 }
 
+// @Summary Returns current account
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/accounts/me [get]
+func (ctl *accountController) CurrentAccount(c *gin.Context) {
+	account := ctl.validateTokenData(c)
+	if account == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	userOutput := ctl.mapToUserOutput(account)
+	helpers.HTTPRes(c, http.StatusOK, "Authenticated account", userOutput)
+}
+
+// @Summary List active user accounts
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/accounts/active_users [get]
+func (ctl *accountController) ListActiveAccounts(c *gin.Context) {
+	account := ctl.validateTokenData(c)
+	if account == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	var paging commoninputs.PagingParams
+	if err := c.BindQuery(&paging); err != nil {
+		paging.Limit = 100
+		paging.Offset = 0
+	}
+	if paging.Limit == 0 {
+		paging.Limit = 100
+	}
+
+	results, err := ctl.AccountUC.ListActiveAccounts(account, &paging)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	var resultOutput []*accountoutputs.AccountPublicOutput
+	for _, a := range results {
+		output := ctl.mapToUserPublicOutput(a)
+		resultOutput = append(resultOutput, output)
+	}
+
+	// Empty array if no results
+	if resultOutput == nil {
+		helpers.HTTPRes(c, http.StatusOK, "Active user accounts", []string{})
+		return
+	}
+
+	// Formatted array
+	helpers.HTTPRes(c, http.StatusOK, "Active user accounts", resultOutput)
+}
+
 // @Summary Login into your application account
 // @Produce json
 // @Success 200 {object} Response
 // @Failure 400 {object} Response
 // @Failure 500 {object} Response
-// @Router /login [post]
+// @Router /api/login [post]
 func (ctl *accountController) Login(c *gin.Context) {
 	var loginInput accountinputs.LoginInput
 	if err := c.BindJSON(&loginInput); err != nil {
@@ -76,7 +140,7 @@ func (ctl *accountController) Login(c *gin.Context) {
 // @Success 200 {object} Response
 // @Failure 400 {object} Response
 // @Failure 500 {object} Response
-// @Router /register [post]
+// @Router /api/register [post]
 func (ctl *accountController) Register(c *gin.Context) {
 	var newAccount accountinputs.RegisterInput
 	if err := c.BindJSON(&newAccount); err != nil {
@@ -109,14 +173,41 @@ func (ctl *accountController) Register(c *gin.Context) {
 	}
 }
 
+/* =========== PRIVATE METHODS =========== */
+
+func (ctl *accountController) validateTokenData(c *gin.Context) *account.Account {
+	id, exists := c.Get("user_email")
+	if exists == false {
+		return nil
+	}
+
+	account, err := ctl.AccountUC.GetAccountByEmail(id.(string))
+	if err != nil {
+		return nil
+	}
+
+	return account
+}
+
 // Map user struct aux function
 func (ctl *accountController) mapToUserOutput(a *account.Account) *accountoutputs.AccountOutput {
 	return &accountoutputs.AccountOutput{
-		ID:       a.ID,
-		Email:    a.Email,
-		Name:     a.Name,
-		Role:     a.Role,
-		IsActive: a.IsActive,
+		ID:           a.ID,
+		Email:        a.Email,
+		Name:         a.Name,
+		Username:     a.Username,
+		Avatar:       *a.Avatar,
+		Role:         a.Role,
+		IsEmailValid: a.IsEmailValid,
+		IsActive:     a.IsActive,
+	}
+}
+
+func (ctl *accountController) mapToUserPublicOutput(a *account.Account) *accountoutputs.AccountPublicOutput {
+	return &accountoutputs.AccountPublicOutput{
+		ID:     a.ID,
+		Name:   a.Name,
+		Avatar: *a.Avatar,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/mazurco066/playliter-api-go/presentation/helpers"
 )
 
 type Claims struct {
@@ -27,7 +28,7 @@ func RequiredLoggedIn(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := stripBearer(c.Request.Header.Get("Authorization"))
 		if err != nil {
-			c.IndentedJSON(http.StatusUnauthorized, err.Error())
+			helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 			c.Abort()
 			return
 		}
@@ -40,7 +41,7 @@ func RequiredLoggedIn(jwtSecret string) gin.HandlerFunc {
 			},
 		)
 		if parseErr != nil {
-			c.IndentedJSON(http.StatusUnauthorized, err.Error())
+			helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 			c.Abort()
 			return
 		}
@@ -49,14 +50,14 @@ func RequiredLoggedIn(jwtSecret string) gin.HandlerFunc {
 			claims, ok := tokenClaims.Claims.(*Claims)
 
 			if ok && tokenClaims.Valid {
-				c.Set("user_id", claims.Account)
+				c.Set("user_email", claims.Account)
 				c.Set("user_role", claims.Role)
 				c.Next()
 				return
 			}
 		}
 
-		c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "Unauthorized"})
+		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		c.Abort()
 		return
 	}

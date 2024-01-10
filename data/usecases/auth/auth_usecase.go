@@ -34,7 +34,7 @@ func (auth *authUseCase) IssueToken(a account.Account) (string, error) {
 
 	claims := Claims{
 		a.Email,
-		string(rune(a.ID)),
+		a.Role,
 		jwt.RegisteredClaims{
 			Issuer:    "Playliter API",
 			ExpiresAt: jwt.NewNumericDate(expireTime),

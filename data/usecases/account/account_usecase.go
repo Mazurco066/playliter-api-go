@@ -2,6 +2,7 @@ package accountusecase
 
 import (
 	accountrepo "github.com/mazurco066/playliter-api-go/data/repositories/account"
+	commoninputs "github.com/mazurco066/playliter-api-go/domain/inputs/common"
 	"github.com/mazurco066/playliter-api-go/domain/models/account"
 	"github.com/mazurco066/playliter-api-go/infra/hmachash"
 	"golang.org/x/crypto/bcrypt"
@@ -10,8 +11,10 @@ import (
 type AccountUseCase interface {
 	ComparePassword(rawPassword string, passwordFromDB string) error
 	Create(*account.Account) error
+	GetAccountByEmail(email string) (*account.Account, error)
 	GetAccountByUsernameOrEmail(filter string) (*account.Account, error)
 	HashPassword(rawPassword string) (string, error)
+	ListActiveAccounts(*account.Account, *commoninputs.PagingParams) ([]*account.Account, error)
 }
 
 type accountUseCase struct {
@@ -45,6 +48,14 @@ func (uc *accountUseCase) Create(account *account.Account) error {
 	return uc.Repo.Create(account)
 }
 
+func (uc *accountUseCase) GetAccountByEmail(email string) (*account.Account, error) {
+	result, err := uc.Repo.FindByUserEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (uc *accountUseCase) GetAccountByUsernameOrEmail(filter string) (*account.Account, error) {
 	result, err := uc.Repo.FindByUsernameOrEmail(filter)
 	if err != nil {
@@ -59,4 +70,8 @@ func (uc *accountUseCase) HashPassword(rawPassword string) (string, error) {
 		return "", err
 	}
 	return string(hashed), err
+}
+
+func (uc *accountUseCase) ListActiveAccounts(account *account.Account, paging *commoninputs.PagingParams) ([]*account.Account, error) {
+	return uc.Repo.FindActiveAccounts(account, paging)
 }

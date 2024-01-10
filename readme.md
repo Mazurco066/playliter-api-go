@@ -5,10 +5,15 @@
 ## Installation
 
 ```sh
-# Install dependencies
+# Start postgres database
+$ sudo docker-compose up -d
 
 # Run apllication (local)
+# Do not forget to setup your .env file according to .env.example file
 $ go run main.go
+
+# Stop postgres database
+$ sudo docker-compose down
 ```
 
 ## Author

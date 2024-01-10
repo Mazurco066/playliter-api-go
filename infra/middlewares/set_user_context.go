@@ -24,9 +24,9 @@ func SetUserContext(jwtSecret string) gin.HandlerFunc {
 		if tokenClaims != nil {
 			claims, ok := tokenClaims.Claims.(*Claims)
 			if ok && tokenClaims.Valid {
-				c.Set("user_id", claims.Account)
+				c.Set("user_email", claims.Account)
 				c.Set("user_role", claims.Role)
-				c.Request = setToContext(c, "user_id", claims.Account)
+				c.Request = setToContext(c, "user_email", claims.Account)
 				c.Request = setToContext(c, "user_role", claims.Role)
 			}
 		}
