@@ -93,7 +93,7 @@ func Run() {
 
 	/* ========= Setup controllers ========= */
 	accountController := accountcontroller.NewAccaccountController(accountService, authService)
-	bandcontroller := bandcontroller.NewBandController(bandService)
+	bandcontroller := bandcontroller.NewBandController(accountService, bandService)
 	concertController := concertcontroller.NewConcertController(concertService)
 	songController := songcontroller.NewSongController(songService)
 
