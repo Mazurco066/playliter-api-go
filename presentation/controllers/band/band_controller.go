@@ -20,6 +20,7 @@ import (
 )
 
 type BandController interface {
+	Invite(*gin.Context)
 	Create(*gin.Context)
 	Get(*gin.Context)
 	List(*gin.Context)
@@ -47,8 +48,8 @@ func NewBandController(
 // @Failure 500 {object} Response
 // @Router /api/bands [post]
 func (ctl *bandController) Create(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -65,22 +66,22 @@ func (ctl *bandController) Create(c *gin.Context) {
 		return
 	}
 
-	band := band.Band{
+	bandObj := band.Band{
 		Title:       newBand.Title,
 		Description: newBand.Description,
-		OwnerID:     account.ID,
-		Owner:       *account,
+		OwnerID:     user.ID,
+		Owner:       *user,
 	}
 	if newBand.Logo != nil {
-		band.Logo = newBand.Logo
+		bandObj.Logo = newBand.Logo
 	}
 
-	if persistErr := ctl.BandUC.Create(&band); persistErr != nil {
+	if persistErr := ctl.BandUC.Create(&bandObj); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band!", persistErr.Error())
 		return
 	}
 
-	bandOutput := ctl.mapToBandOutput(&band)
+	bandOutput := ctl.mapToBandOutput(&bandObj)
 	helpers.HTTPRes(c, http.StatusOK, "Band successfully created!", bandOutput)
 }
 
@@ -91,8 +92,8 @@ func (ctl *bandController) Create(c *gin.Context) {
 // @Failure 500 {object} Response
 // @Router /api/bands/:id [get]
 func (ctl *bandController) Get(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -103,7 +104,7 @@ func (ctl *bandController) Get(c *gin.Context) {
 		return
 	}
 
-	band, err := ctl.BandUC.FindById(id)
+	bandResult, err := ctl.BandUC.FindById(id)
 	if err != nil {
 		es := err.Error()
 		if strings.Contains(es, "not found") {
@@ -115,13 +116,96 @@ func (ctl *bandController) Get(c *gin.Context) {
 	}
 
 	// Validate if user is a current band member
-	if band.OwnerID != account.ID && !ctl.isBandMember(band.Members, account.ID) {
+	if bandResult.OwnerID != user.ID && !ctl.isBandMember(bandResult.Members, user.ID) {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
 
-	bandOutput := ctl.mapToBandOutput(band)
+	bandOutput := ctl.mapToBandOutput(bandResult)
 	helpers.HTTPRes(c, http.StatusOK, "Band retrieved!", bandOutput)
+}
+
+// @Summary Invite account to join the band
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id/invite/:account_id [post]
+func (ctl *bandController) Invite(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	invitedId, err := ctl.stringToUint(c.Param(("account_id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Validate if user is a current band admin
+	if bandResult.OwnerID != user.ID && !ctl.isBandAdmin(bandResult.Members, user.ID) {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	// Verify if desired user is already a band member
+	if invitedId == bandResult.OwnerID || ctl.isBandMember(bandResult.Members, invitedId) {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invited account is already a band member", nil)
+		return
+	}
+
+	invitedUser, err := ctl.AccountUc.GetAccountById(invitedId)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Account not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Just double checking if an invite for this account already exists
+	inviteExists := ctl.BandUC.InviteExists(invitedUser, bandResult)
+	if inviteExists {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Account was already invited. Please wait for a response from given account.", nil)
+		return
+	}
+
+	bandRequestObj := band.BandRequest{
+		BandID:    bandResult.ID,
+		Band:      *bandResult,
+		InvitedID: invitedUser.ID,
+		Invited:   *invitedUser,
+		Status:    "pending",
+	}
+
+	if persistErr := ctl.BandUC.CreateInvite(&bandRequestObj); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band request!", persistErr.Error())
+		return
+	}
+
+	requestOutput := ctl.mapToBandRequestOutput(&bandRequestObj)
+	helpers.HTTPRes(c, http.StatusOK, "Account successfully invited", requestOutput)
 }
 
 // @Summary List account bands
@@ -131,8 +215,8 @@ func (ctl *bandController) Get(c *gin.Context) {
 // @Failure 500 {object} Response
 // @Router /api/bands [get]
 func (ctl *bandController) List(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -143,7 +227,7 @@ func (ctl *bandController) List(c *gin.Context) {
 		paging.Offset = 0
 	}
 
-	results, err := ctl.BandUC.FindByAccount(account, &paging)
+	results, err := ctl.BandUC.FindByAccount(user, &paging)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
 		return
@@ -173,12 +257,12 @@ func (ctl *bandController) validateTokenData(c *gin.Context) *account.Account {
 		return nil
 	}
 
-	account, err := ctl.AccountUc.GetAccountByEmail(id.(string))
+	user, err := ctl.AccountUc.GetAccountByEmail(id.(string))
 	if err != nil {
 		return nil
 	}
 
-	return account
+	return user
 }
 
 func (ctl *bandController) isBandMember(members []band.Member, accountID uint) bool {
@@ -207,7 +291,6 @@ func (ctl *bandController) stringToUint(IDParam string) (uint, error) {
 	return uint(userID), nil
 }
 
-// Map band to struct aux function
 func (ctl *bandController) mapToBandOutput(b *band.Band) *bandoutputs.BandOutput {
 	return &bandoutputs.BandOutput{
 		ID:          b.ID,
@@ -224,5 +307,38 @@ func (ctl *bandController) mapToBandOutput(b *band.Band) *bandoutputs.BandOutput
 			Role:         b.Owner.Role,
 			IsActive:     b.Owner.IsActive,
 		},
+	}
+}
+
+func (ctl *bandController) mapToBandRequestOutput(b *band.BandRequest) *bandoutputs.BandRequestOutput {
+	return &bandoutputs.BandRequestOutput{
+		ID: b.ID,
+		Band: &bandoutputs.BandOutput{
+			ID:          b.Band.ID,
+			Logo:        *b.Band.Logo,
+			Title:       b.Band.Title,
+			Description: b.Band.Description,
+			Owner: &accountoutputs.AccountOutput{
+				ID:           b.Band.Owner.ID,
+				Name:         b.Band.Owner.Name,
+				Username:     b.Band.Owner.Username,
+				Email:        b.Band.Owner.Email,
+				Avatar:       *b.Band.Owner.Avatar,
+				IsEmailValid: b.Band.Owner.IsEmailValid,
+				Role:         b.Band.Owner.Role,
+				IsActive:     b.Band.Owner.IsActive,
+			},
+		},
+		Invited: &accountoutputs.AccountOutput{
+			ID:           b.Invited.ID,
+			Name:         b.Invited.Name,
+			Username:     b.Invited.Username,
+			Email:        b.Invited.Email,
+			Avatar:       *b.Invited.Avatar,
+			IsEmailValid: b.Invited.IsEmailValid,
+			Role:         b.Invited.Role,
+			IsActive:     b.Invited.IsActive,
+		},
+		Status: b.Status,
 	}
 }

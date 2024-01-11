@@ -81,13 +81,15 @@ func Run() {
 	/* ========= Setup repositories ========= */
 	accountRepo := accountrepo.NewAccountRepo(db)
 	bandRepo := bandrepo.NewBandRepo(db)
+	bandRequestRepo := bandrepo.NewBandRequestRepo(db)
+	memberRepo := bandrepo.NewMemberRepo(db)
 	concertRepo := concertrepo.NewConcertRepo(db)
 	songrepo := songrepo.NewSongRepo(db)
 
 	/* ========= Setup usecases ========= */
 	accountService := accountusecase.NewAccountUseCase(accountRepo, hm)
 	authService := authusecase.NewAuthUseCase(configs.JWTSecret)
-	bandService := bandusecase.NewBandUseCase(bandRepo)
+	bandService := bandusecase.NewBandUseCase(bandRepo, bandRequestRepo, memberRepo)
 	concertService := concertusecase.NewConcertUseCase(concertRepo)
 	songService := songusecase.NewSongUseCase(songrepo)
 
@@ -123,6 +125,7 @@ func Run() {
 		bands.POST("/", bandcontroller.Create)
 		bands.GET("/", bandcontroller.List)
 		bands.GET("/:id", bandcontroller.Get)
+		bands.POST("/:id/invite/:account_id", bandcontroller.Invite)
 	}
 
 	/* ========= App concert routes ========= */

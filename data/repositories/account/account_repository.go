@@ -9,8 +9,9 @@ import (
 type Repo interface {
 	Create(*account.Account) error
 	FindActiveAccounts(*account.Account, *commoninputs.PagingParams) ([]*account.Account, error)
-	FindByUserEmail(email string) (*account.Account, error)
-	FindByUsernameOrEmail(filter string) (*account.Account, error)
+	FindByUserID(uint) (*account.Account, error)
+	FindByUserEmail(string) (*account.Account, error)
+	FindByUsernameOrEmail(string) (*account.Account, error)
 	Update(*account.Account) error
 }
 
@@ -40,6 +41,14 @@ func (repo *AccountRepo) FindActiveAccounts(a *account.Account, p *commoninputs.
 		return nil, err
 	}
 	return results, nil
+}
+
+func (repo *AccountRepo) FindByUserID(id uint) (*account.Account, error) {
+	var account account.Account
+	if err := repo.db.Where("id = ? AND is_active = ?", id, true).First(&account).Error; err != nil {
+		return nil, err
+	}
+	return &account, nil
 }
 
 func (repo *AccountRepo) FindByUserEmail(email string) (*account.Account, error) {

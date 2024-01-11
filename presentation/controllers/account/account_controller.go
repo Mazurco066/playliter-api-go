@@ -44,13 +44,13 @@ func NewAccaccountController(
 // @Failure 500 {object} Response
 // @Router /api/accounts/me [get]
 func (ctl *accountController) CurrentAccount(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
 
-	userOutput := ctl.mapToUserOutput(account)
+	userOutput := ctl.mapToUserOutput(user)
 	helpers.HTTPRes(c, http.StatusOK, "Authenticated account", userOutput)
 }
 
@@ -61,8 +61,8 @@ func (ctl *accountController) CurrentAccount(c *gin.Context) {
 // @Failure 500 {object} Response
 // @Router /api/accounts/active_users [get]
 func (ctl *accountController) ListActiveAccounts(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -73,7 +73,7 @@ func (ctl *accountController) ListActiveAccounts(c *gin.Context) {
 		paging.Offset = 0
 	}
 
-	results, err := ctl.AccountUC.ListActiveAccounts(account, &paging)
+	results, err := ctl.AccountUC.ListActiveAccounts(user, &paging)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
 		return
@@ -114,19 +114,19 @@ func (ctl *accountController) Login(c *gin.Context) {
 		return
 	}
 
-	account, err := ctl.AccountUC.GetAccountByUsernameOrEmail(loginInput.UsernameOrEmail)
+	user, err := ctl.AccountUC.GetAccountByUsernameOrEmail(loginInput.UsernameOrEmail)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
-	err = ctl.AccountUC.ComparePassword(loginInput.Password, account.Password)
+	err = ctl.AccountUC.ComparePassword(loginInput.Password, user.Password)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
-	err = ctl.login(c, account)
+	err = ctl.login(c, user)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
@@ -152,21 +152,21 @@ func (ctl *accountController) Register(c *gin.Context) {
 		return
 	}
 
-	account := account.Account{
+	user := account.Account{
 		Email:    newAccount.Email,
 		Username: newAccount.Username,
 		Name:     newAccount.Name,
 		Password: newAccount.Password,
 	}
 
-	if persistErr := ctl.AccountUC.Create(&account); persistErr != nil {
+	if persistErr := ctl.AccountUC.Create(&user); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting account!", persistErr.Error())
 		return
 	}
 
 	// Todo: Implement a mailer referencing sendgrid to send confirmation E-mail
 
-	err := ctl.login(c, &account)
+	err := ctl.login(c, &user)
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
@@ -180,8 +180,8 @@ func (ctl *accountController) Register(c *gin.Context) {
 // @Failure 500 {object} Response
 // @Router /api/accounts/me [patch]
 func (ctl *accountController) Update(c *gin.Context) {
-	account := ctl.validateTokenData(c)
-	if account == nil {
+	user := ctl.validateTokenData(c)
+	if user == nil {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -210,32 +210,32 @@ func (ctl *accountController) Update(c *gin.Context) {
 
 	// In this section if the user changes his email it will need an additional validation agrain
 	canSendConfirmationEmail := false
-	if newAccountData.Email != "" && newAccountData.Email != account.Email {
-		account.Email = newAccountData.Email
-		account.IsEmailValid = false
+	if newAccountData.Email != "" && newAccountData.Email != user.Email {
+		user.Email = newAccountData.Email
+		user.IsEmailValid = false
 		canSendConfirmationEmail = true
 	}
 
 	// In this section if user wants to update his password the old password must match current one
 	hashPasswd := false
 	if newAccountData.Password != "" {
-		err := ctl.AccountUC.ComparePassword(newAccountData.OldPassword, account.Password)
+		err := ctl.AccountUC.ComparePassword(newAccountData.OldPassword, user.Password)
 		if err != nil {
 			helpers.HTTPRes(c, http.StatusBadRequest, "Old password is incorrect! Try again.", nil)
 			return
 		}
-		account.Password = newAccountData.Password
+		user.Password = newAccountData.Password
 		hashPasswd = true
 	}
 
 	if newAccountData.Name != "" {
-		account.Name = newAccountData.Name
+		user.Name = newAccountData.Name
 	}
 	if newAccountData.Avatar != "" {
-		account.Avatar = &newAccountData.Avatar
+		user.Avatar = &newAccountData.Avatar
 	}
 
-	if persistErr := ctl.AccountUC.Update(account, hashPasswd); persistErr != nil {
+	if persistErr := ctl.AccountUC.Update(user, hashPasswd); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting account!", persistErr.Error())
 		return
 	}
@@ -245,7 +245,7 @@ func (ctl *accountController) Update(c *gin.Context) {
 		// Todo: Implement mailer (sendgrid)
 
 		// As user updated his email that corresponds to his token key it will be necessary a new token
-		err := ctl.login(c, account)
+		err := ctl.login(c, user)
 		if err != nil {
 			helpers.HTTPRes(c, http.StatusUnauthorized, "Unauthorized", nil)
 			return
@@ -253,7 +253,7 @@ func (ctl *accountController) Update(c *gin.Context) {
 	}
 
 	// As the user didn't updated his email a new token will not be required
-	outputUser := ctl.mapToUserOutput(account)
+	outputUser := ctl.mapToUserOutput(user)
 	out := gin.H{"token": nil, "user": outputUser}
 	helpers.HTTPRes(c, http.StatusOK, "Account successfully updated!", out)
 }
@@ -266,12 +266,12 @@ func (ctl *accountController) validateTokenData(c *gin.Context) *account.Account
 		return nil
 	}
 
-	account, err := ctl.AccountUC.GetAccountByEmail(id.(string))
+	user, err := ctl.AccountUC.GetAccountByEmail(id.(string))
 	if err != nil {
 		return nil
 	}
 
-	return account
+	return user
 }
 
 // Map user struct aux function

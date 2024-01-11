@@ -11,7 +11,7 @@ type Account struct {
 	IsEmailValid bool    `gorm:"default:false" json:"is_email_valid"`
 	Username     string  `gorm:"unique" json:"username"`
 	Name         string  `json:"name"`
-	Role         string  `gorm:"default:'player'" json:"role"`
+	Role         string  `gorm:"default:'player'" json:"role"` // "player", "master"
 	Password     string  `json:"password"`
 	IsActive     bool    `gorm:"default:true" json:"is_active"`
 }

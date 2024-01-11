@@ -11,9 +11,10 @@ import (
 type AccountUseCase interface {
 	ComparePassword(rawPassword string, passwordFromDB string) error
 	Create(*account.Account) error
-	GetAccountByEmail(email string) (*account.Account, error)
-	GetAccountByUsernameOrEmail(filter string) (*account.Account, error)
-	HashPassword(rawPassword string) (string, error)
+	GetAccountById(uint) (*account.Account, error)
+	GetAccountByEmail(string) (*account.Account, error)
+	GetAccountByUsernameOrEmail(string) (*account.Account, error)
+	HashPassword(string) (string, error)
 	ListActiveAccounts(*account.Account, *commoninputs.PagingParams) ([]*account.Account, error)
 	Update(*account.Account, bool) error
 }
@@ -47,6 +48,14 @@ func (uc *accountUseCase) Create(account *account.Account) error {
 	}
 	account.Password = hashedPass
 	return uc.Repo.Create(account)
+}
+
+func (uc *accountUseCase) GetAccountById(id uint) (*account.Account, error) {
+	result, err := uc.Repo.FindByUserID(id)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (uc *accountUseCase) GetAccountByEmail(email string) (*account.Account, error) {

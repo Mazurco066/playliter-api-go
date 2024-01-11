@@ -9,20 +9,32 @@ import (
 
 type BandUseCase interface {
 	Create(*band.Band) error
+	CreateInvite(*band.BandRequest) error
+	InviteExists(*account.Account, *band.Band) bool
 	FindByAccount(*account.Account, *commoninputs.PagingParams) ([]*band.Band, error)
 	FindById(uint) (*band.Band, error)
 }
 
 type bandUseCase struct {
-	Repo bandrepo.Repo
+	Repo            bandrepo.Repo
+	BandRequestRepo bandrepo.BandRequestRepo
+	MemberRepo      bandrepo.MemberRepo
 }
 
 func NewBandUseCase(
 	repo bandrepo.Repo,
+	bandRequestRepo bandrepo.BandRequestRepo,
+	memberRepo bandrepo.MemberRepo,
 ) BandUseCase {
 	return &bandUseCase{
-		Repo: repo,
+		Repo:            repo,
+		BandRequestRepo: bandRequestRepo,
+		MemberRepo:      memberRepo,
 	}
+}
+
+func (uc *bandUseCase) CreateInvite(request *band.BandRequest) error {
+	return uc.BandRequestRepo.Create(request)
 }
 
 func (uc *bandUseCase) Create(band *band.Band) error {
@@ -42,4 +54,12 @@ func (uc *bandUseCase) FindById(id uint) (*band.Band, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+func (uc *bandUseCase) InviteExists(a *account.Account, b *band.Band) bool {
+	invite, _ := uc.BandRequestRepo.FindByAccountAndBand(a, b)
+	if invite != nil {
+		return true
+	}
+	return false
 }
