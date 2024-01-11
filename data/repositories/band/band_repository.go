@@ -29,11 +29,13 @@ func (repo *BandRepo) Create(band *band.Band) error {
 
 func (repo *BandRepo) FindByAccount(a *account.Account, p *commoninputs.PagingParams) ([]*band.Band, error) {
 	var results []*band.Band
-	if err := repo.db.Where("owner_id = ?", a.ID).
+	if err := repo.db.
+		Where("owner_id = ? OR EXISTS (SELECT 1 FROM members WHERE bands.id = members.band_id AND members.account_id = ?)", a.ID, a.ID).
 		Preload("Owner").
 		Preload("Members").
 		Limit(p.Limit).
 		Offset(p.Offset).
+		Group("bands.id").
 		Find(&results).Error; err != nil {
 		return nil, err
 	}
@@ -42,7 +44,8 @@ func (repo *BandRepo) FindByAccount(a *account.Account, p *commoninputs.PagingPa
 
 func (repo *BandRepo) FindById(id uint) (*band.Band, error) {
 	var band band.Band
-	if err := repo.db.Where("id = ?", id).
+	if err := repo.db.
+		Where("id = ?", id).
 		Preload("Owner").
 		Preload("Members").
 		First(&band).Error; err != nil {

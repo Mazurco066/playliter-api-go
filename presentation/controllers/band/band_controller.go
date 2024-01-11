@@ -115,7 +115,7 @@ func (ctl *bandController) Get(c *gin.Context) {
 	}
 
 	// Validate if user is a current band member
-	if band.OwnerID != account.ID {
+	if band.OwnerID != account.ID && !ctl.isBandMember(band.Members, account.ID) {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
@@ -179,6 +179,24 @@ func (ctl *bandController) validateTokenData(c *gin.Context) *account.Account {
 	}
 
 	return account
+}
+
+func (ctl *bandController) isBandMember(members []band.Member, accountID uint) bool {
+	for _, member := range members {
+		if member.AccountID == accountID {
+			return true
+		}
+	}
+	return false
+}
+
+func (ctl *bandController) isBandAdmin(members []band.Member, accountID uint) bool {
+	for _, member := range members {
+		if member.AccountID == accountID && member.Role == "admin" {
+			return true
+		}
+	}
+	return false
 }
 
 func (ctl *bandController) stringToUint(IDParam string) (uint, error) {

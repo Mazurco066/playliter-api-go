@@ -44,7 +44,7 @@ func (repo *AccountRepo) FindActiveAccounts(a *account.Account, p *commoninputs.
 
 func (repo *AccountRepo) FindByUserEmail(email string) (*account.Account, error) {
 	var account account.Account
-	if err := repo.db.Where("email = ?", email).First(&account).Error; err != nil {
+	if err := repo.db.Where("email = ? AND is_active = ?", email, true).First(&account).Error; err != nil {
 		return nil, err
 	}
 	return &account, nil
@@ -53,8 +53,8 @@ func (repo *AccountRepo) FindByUserEmail(email string) (*account.Account, error)
 func (repo *AccountRepo) FindByUsernameOrEmail(filter string) (*account.Account, error) {
 	var account account.Account
 	if err := repo.db.Where(
-		"email = ? OR username = ?",
-		filter, filter,
+		"email = ? OR username = ? AND is_active = ?",
+		filter, filter, true,
 	).First(&account).Error; err != nil {
 		return nil, err
 	}
