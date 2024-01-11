@@ -33,7 +33,10 @@ func (repo *AccountRepo) FindActiveAccounts(a *account.Account, p *commoninputs.
 	if err := repo.db.Where(
 		"is_active = ? AND id != ?",
 		true, a.ID,
-	).Limit(p.Limit).Offset(p.Offset).Find(&results).Error; err != nil {
+	).
+		Limit(p.Limit).
+		Offset(p.Offset).
+		Find(&results).Error; err != nil {
 		return nil, err
 	}
 	return results, nil

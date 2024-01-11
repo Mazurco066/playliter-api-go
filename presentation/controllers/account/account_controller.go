@@ -72,9 +72,6 @@ func (ctl *accountController) ListActiveAccounts(c *gin.Context) {
 		paging.Limit = 100
 		paging.Offset = 0
 	}
-	if paging.Limit == 0 {
-		paging.Limit = 100
-	}
 
 	results, err := ctl.AccountUC.ListActiveAccounts(account, &paging)
 	if err != nil {

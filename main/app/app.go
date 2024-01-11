@@ -121,6 +121,8 @@ func Run() {
 	bands.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
 	{
 		bands.POST("/", bandcontroller.Create)
+		bands.GET("/", bandcontroller.List)
+		bands.GET("/:id", bandcontroller.Get)
 	}
 
 	/* ========= App concert routes ========= */

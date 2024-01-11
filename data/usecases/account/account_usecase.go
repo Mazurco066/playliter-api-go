@@ -74,6 +74,9 @@ func (uc *accountUseCase) HashPassword(rawPassword string) (string, error) {
 }
 
 func (uc *accountUseCase) ListActiveAccounts(account *account.Account, paging *commoninputs.PagingParams) ([]*account.Account, error) {
+	if paging.Limit == 0 {
+		paging.Limit = 100
+	}
 	return uc.Repo.FindActiveAccounts(account, paging)
 }
 
