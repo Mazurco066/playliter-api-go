@@ -1,6 +1,10 @@
 package bandoutputs
 
-import accountoutputs "github.com/mazurco066/playliter-api-go/domain/outputs/account"
+import (
+	"time"
+
+	accountoutputs "github.com/mazurco066/playliter-api-go/domain/outputs/account"
+)
 
 type BandOutput struct {
 	ID          uint                          `json:"id"`
@@ -15,4 +19,12 @@ type BandRequestOutput struct {
 	Band    *BandOutput                   `json:"band"`
 	Invited *accountoutputs.AccountOutput `json:"invited"`
 	Status  string                        `json:"status"`
+}
+
+type MemberOutput struct {
+	ID       uint                          `json:"id"`
+	Band     *BandOutput                   `json:"band"`
+	Account  *accountoutputs.AccountOutput `json:"account"`
+	JoinedAt time.Time                     `json:"joined_at"`
+	Role     string                        `json:"role"`
 }

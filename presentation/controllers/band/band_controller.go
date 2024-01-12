@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -20,10 +21,13 @@ import (
 )
 
 type BandController interface {
-	Invite(*gin.Context)
 	Create(*gin.Context)
+	ExpelMember(*gin.Context)
 	Get(*gin.Context)
+	Invite(*gin.Context)
 	List(*gin.Context)
+	RespondInvite(*gin.Context)
+	UpdateMember(*gin.Context)
 }
 
 type bandController struct {
@@ -249,6 +253,239 @@ func (ctl *bandController) List(c *gin.Context) {
 	helpers.HTTPRes(c, http.StatusOK, "Bands successfully listed!", resultOutput)
 }
 
+// @Summary Respond band invite
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id/invite/:invite_id [patch]
+func (ctl *bandController) RespondInvite(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	inviteId, err := ctl.stringToUint(c.Param(("invite_id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	inviteResult, err := ctl.BandUC.FindInviteById(inviteId)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band invitation not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	if id != inviteResult.BandID || user.ID != inviteResult.InvitedID {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid band invite!", nil)
+		return
+	}
+
+	var updateInput bandinputs.UpdateInviteInput
+	if err := c.BindJSON(&updateInput); err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	validate := validator.New()
+	if validationErr := validate.Struct(updateInput); validationErr != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", validationErr.Error())
+		return
+	}
+
+	if updateInput.Status != "accepted" && updateInput.Status != "denied" {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	// It means that user accepted the invitation so now he will become a member
+	if updateInput.Status == "accepted" {
+		memberObj := band.Member{
+			BandID:    inviteResult.BandID,
+			Band:      inviteResult.Band,
+			AccountID: inviteResult.InvitedID,
+			Account:   inviteResult.Invited,
+			Role:      "member",
+			JoinedAt:  time.Now(),
+		}
+
+		if persistErr := ctl.BandUC.CreateMember(&memberObj); persistErr != nil {
+			helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting the new band member!", persistErr.Error())
+			return
+		}
+	}
+
+	inviteResult.Status = updateInput.Status
+	if persistErr := ctl.BandUC.UpdateInvite(inviteResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting the band invite data!", persistErr.Error())
+		return
+	}
+
+	helpers.HTTPRes(c, http.StatusOK, "Invite successfully responded", nil)
+}
+
+// @Summary Promote or Demote band member into admin
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id/member/:member_id [patch]
+func (ctl *bandController) UpdateMember(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	memberId, err := ctl.stringToUint(c.Param(("member_id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	memberResult, err := ctl.BandUC.FindMemberById(memberId)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band Member not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Verify if desired user is already a band admin
+	if user.ID != bandResult.OwnerID && !ctl.isBandAdmin(bandResult.Members, user.ID) {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	var updateInput bandinputs.UpdateMemberInput
+	if err := c.BindJSON(&updateInput); err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	validate := validator.New()
+	if validationErr := validate.Struct(updateInput); validationErr != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", validationErr.Error())
+		return
+	}
+
+	if updateInput.Role != "admin" && updateInput.Role != "member" {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	memberOutput := ctl.mapToMemberOutput(memberResult)
+	if memberResult.Role == updateInput.Role {
+		helpers.HTTPRes(c, http.StatusOK, "No need to update this member!", memberOutput)
+		return
+	}
+
+	// Updating member reference
+	memberResult.Role = updateInput.Role
+	if persistErr := ctl.BandUC.UpdateMember(memberResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band member!", persistErr.Error())
+		return
+	}
+
+	memberOutput = ctl.mapToMemberOutput(memberResult)
+	helpers.HTTPRes(c, http.StatusOK, "Member successfully updated!", memberOutput)
+}
+
+// @Summary Expel members from band
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id/member/:member_id [delete]
+func (ctl *bandController) ExpelMember(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	memberId, err := ctl.stringToUint(c.Param(("member_id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	memberResult, err := ctl.BandUC.FindMemberById(memberId)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band Member not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Verify if desired user is already a band admin
+	if user.ID != bandResult.OwnerID && !ctl.isBandAdmin(bandResult.Members, user.ID) {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	// Remove member from band
+	if persistErr := ctl.BandUC.RemoveMember(memberResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error deleting band member!", persistErr.Error())
+		return
+	}
+
+	helpers.HTTPRes(c, http.StatusNoContent, "Band member successfully expeled!", nil)
+}
+
 /* =========== PRIVATE METHODS =========== */
 
 func (ctl *bandController) validateTokenData(c *gin.Context) *account.Account {
@@ -340,5 +577,29 @@ func (ctl *bandController) mapToBandRequestOutput(b *band.BandRequest) *bandoutp
 			IsActive:     b.Invited.IsActive,
 		},
 		Status: b.Status,
+	}
+}
+
+func (ctl *bandController) mapToMemberOutput(b *band.Member) *bandoutputs.MemberOutput {
+	return &bandoutputs.MemberOutput{
+		ID: b.ID,
+		Band: &bandoutputs.BandOutput{
+			ID:          b.Band.ID,
+			Logo:        *b.Band.Logo,
+			Title:       b.Band.Title,
+			Description: b.Band.Description,
+		},
+		Account: &accountoutputs.AccountOutput{
+			ID:           b.Account.ID,
+			Name:         b.Account.Name,
+			Username:     b.Account.Username,
+			Email:        b.Account.Email,
+			Avatar:       *b.Account.Avatar,
+			IsEmailValid: b.Account.IsEmailValid,
+			Role:         b.Account.Role,
+			IsActive:     b.Account.IsActive,
+		},
+		Role:     b.Role,
+		JoinedAt: b.JoinedAt,
 	}
 }

@@ -8,7 +8,9 @@ import (
 
 type BandRequestRepo interface {
 	Create(*band.BandRequest) error
+	FindById(uint) (*band.BandRequest, error)
 	FindByAccountAndBand(*account.Account, *band.Band) (*band.BandRequest, error)
+	Update(*band.BandRequest) error
 }
 
 type bandRequestRepo struct {
@@ -25,6 +27,18 @@ func (repo *bandRequestRepo) Create(request *band.BandRequest) error {
 	return repo.db.Create(request).Error
 }
 
+func (repo *bandRequestRepo) FindById(id uint) (*band.BandRequest, error) {
+	var request band.BandRequest
+	if err := repo.db.
+		Where("id = ? AND status = ?", id, "pending").
+		Preload("Band").
+		Preload("Invited").
+		First(&request).Error; err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
 func (repo *bandRequestRepo) FindByAccountAndBand(a *account.Account, b *band.Band) (*band.BandRequest, error) {
 	var request band.BandRequest
 	if err := repo.db.
@@ -35,4 +49,8 @@ func (repo *bandRequestRepo) FindByAccountAndBand(a *account.Account, b *band.Ba
 		return nil, err
 	}
 	return &request, nil
+}
+
+func (repo *bandRequestRepo) Update(request *band.BandRequest) error {
+	return repo.db.Save(request).Error
 }

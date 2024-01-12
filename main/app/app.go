@@ -95,7 +95,7 @@ func Run() {
 
 	/* ========= Setup controllers ========= */
 	accountController := accountcontroller.NewAccaccountController(accountService, authService)
-	bandcontroller := bandcontroller.NewBandController(accountService, bandService)
+	bandController := bandcontroller.NewBandController(accountService, bandService)
 	concertController := concertcontroller.NewConcertController(concertService)
 	songController := songcontroller.NewSongController(songService)
 
@@ -122,10 +122,13 @@ func Run() {
 	bands := api.Group("/bands")
 	bands.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
 	{
-		bands.POST("/", bandcontroller.Create)
-		bands.GET("/", bandcontroller.List)
-		bands.GET("/:id", bandcontroller.Get)
-		bands.POST("/:id/invite/:account_id", bandcontroller.Invite)
+		bands.POST("/", bandController.Create)
+		bands.GET("/", bandController.List)
+		bands.GET("/:id", bandController.Get)
+		bands.POST("/:id/invite/:account_id", bandController.Invite)
+		bands.PATCH("/:id/invite/:invite_id", bandController.RespondInvite)
+		bands.PATCH("/:id/member/:member_id", bandController.UpdateMember)
+		bands.DELETE(":id/member/:member_id", bandController.ExpelMember)
 	}
 
 	/* ========= App concert routes ========= */
