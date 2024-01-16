@@ -16,7 +16,9 @@ type BandUseCase interface {
 	FindByAccount(*account.Account, *commoninputs.PagingParams) ([]*band.Band, error)
 	FindById(uint) (*band.Band, error)
 	FindMemberById(uint) (*band.Member, error)
+	Remove(*band.Band) error
 	RemoveMember(*band.Member) error
+	Update(*band.Band) error
 	UpdateInvite(*band.BandRequest) error
 	UpdateMember(*band.Member) error
 }
@@ -86,12 +88,20 @@ func (uc *bandUseCase) InviteExists(a *account.Account, b *band.Band) bool {
 	return false
 }
 
+func (uc *bandUseCase) Remove(b *band.Band) error {
+	return uc.Repo.Remove(b)
+}
+
 func (uc *bandUseCase) RemoveMember(m *band.Member) error {
 	return uc.MemberRepo.Remove(m)
 }
 
 func (uc *bandUseCase) UpdateInvite(request *band.BandRequest) error {
 	return uc.BandRequestRepo.Update(request)
+}
+
+func (uc *bandUseCase) Update(b *band.Band) error {
+	return uc.Repo.Update(b)
 }
 
 func (uc *bandUseCase) UpdateMember(m *band.Member) error {

@@ -11,6 +11,8 @@ type Repo interface {
 	Create(*band.Band) error
 	FindByAccount(*account.Account, *commoninputs.PagingParams) ([]*band.Band, error)
 	FindById(uint) (*band.Band, error)
+	Remove(*band.Band) error
+	Update(*band.Band) error
 }
 
 type BandRepo struct {
@@ -52,4 +54,12 @@ func (repo *BandRepo) FindById(id uint) (*band.Band, error) {
 		return nil, err
 	}
 	return &band, nil
+}
+
+func (repo *BandRepo) Update(band *band.Band) error {
+	return repo.db.Save(band).Error
+}
+
+func (repo *BandRepo) Remove(band *band.Band) error {
+	return repo.db.Delete(band).Error
 }

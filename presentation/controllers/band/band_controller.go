@@ -26,7 +26,9 @@ type BandController interface {
 	Get(*gin.Context)
 	Invite(*gin.Context)
 	List(*gin.Context)
+	Remove(*gin.Context)
 	RespondInvite(*gin.Context)
+	Update(*gin.Context)
 	UpdateMember(*gin.Context)
 }
 
@@ -253,6 +255,51 @@ func (ctl *bandController) List(c *gin.Context) {
 	helpers.HTTPRes(c, http.StatusOK, "Bands successfully listed!", resultOutput)
 }
 
+// @Summary Delete band endpoint
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id [delete]
+func (ctl *bandController) Remove(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Verify if user is the band owner
+	if user.ID != bandResult.OwnerID {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	// TODO: Remove band concerts, songs and mambers, also delete invites
+	if persistErr := ctl.BandUC.Remove(bandResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error deleting band!", persistErr.Error())
+		return
+	}
+
+	helpers.HTTPRes(c, http.StatusNoContent, "Band successfully deleted!", nil)
+}
+
 // @Summary Respond band invite
 // @Produce json
 // @Success 200 {object} Response
@@ -335,6 +382,74 @@ func (ctl *bandController) RespondInvite(c *gin.Context) {
 	}
 
 	helpers.HTTPRes(c, http.StatusOK, "Invite successfully responded", nil)
+}
+
+// @Summary Updated band data endpoint
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id [patch]
+func (ctl *bandController) Update(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Verify if user is a band admin
+	if user.ID != bandResult.OwnerID && !ctl.isBandAdmin(bandResult.Members, user.ID) {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	var updateInput bandinputs.UpdateInput
+	if err := c.BindJSON(&updateInput); err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", nil)
+		return
+	}
+
+	validate := validator.New()
+	if validationErr := validate.Struct(updateInput); validationErr != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Invalid Payload", validationErr.Error())
+		return
+	}
+
+	// Update band and persist
+	if updateInput.Title != "" {
+		bandResult.Title = updateInput.Title
+	}
+	if updateInput.Description != "" {
+		bandResult.Description = updateInput.Description
+	}
+	if updateInput.Logo != nil {
+		bandResult.Logo = updateInput.Logo
+	}
+
+	if persistErr := ctl.BandUC.Update(bandResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band!", persistErr.Error())
+		return
+	}
+
+	bandOutput := ctl.mapToBandOutput(bandResult)
+	helpers.HTTPRes(c, http.StatusOK, "Band successfully updated", bandOutput)
 }
 
 // @Summary Promote or Demote band member into admin
