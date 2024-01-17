@@ -28,22 +28,29 @@ type BandController interface {
 	List(*gin.Context)
 	Remove(*gin.Context)
 	RespondInvite(*gin.Context)
+	Transfer(*gin.Context)
 	Update(*gin.Context)
 	UpdateMember(*gin.Context)
 }
 
 type bandController struct {
-	AccountUc accountusecase.AccountUseCase
-	BandUC    bandusecase.BandUseCase
+	AccountUc     accountusecase.AccountUseCase
+	BandUC        bandusecase.BandUseCase
+	BandRequestUC bandusecase.BandRequestUseCase
+	MemberUC      bandusecase.MemberUseCase
 }
 
 func NewBandController(
 	accountUc accountusecase.AccountUseCase,
 	bandUc bandusecase.BandUseCase,
+	bandRequestUc bandusecase.BandRequestUseCase,
+	memberUc bandusecase.MemberUseCase,
 ) BandController {
 	return &bandController{
-		AccountUc: accountUc,
-		BandUC:    bandUc,
+		AccountUc:     accountUc,
+		BandUC:        bandUc,
+		BandRequestUC: bandRequestUc,
+		MemberUC:      memberUc,
 	}
 }
 
@@ -191,7 +198,7 @@ func (ctl *bandController) Invite(c *gin.Context) {
 	}
 
 	// Just double checking if an invite for this account already exists
-	inviteExists := ctl.BandUC.InviteExists(invitedUser, bandResult)
+	inviteExists := ctl.BandRequestUC.InviteExists(invitedUser, bandResult)
 	if inviteExists {
 		helpers.HTTPRes(c, http.StatusBadRequest, "Account was already invited. Please wait for a response from given account.", nil)
 		return
@@ -205,7 +212,7 @@ func (ctl *bandController) Invite(c *gin.Context) {
 		Status:    "pending",
 	}
 
-	if persistErr := ctl.BandUC.CreateInvite(&bandRequestObj); persistErr != nil {
+	if persistErr := ctl.BandRequestUC.Create(&bandRequestObj); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band request!", persistErr.Error())
 		return
 	}
@@ -325,7 +332,7 @@ func (ctl *bandController) RespondInvite(c *gin.Context) {
 		return
 	}
 
-	inviteResult, err := ctl.BandUC.FindInviteById(inviteId)
+	inviteResult, err := ctl.BandRequestUC.FindById(inviteId)
 	if err != nil {
 		es := err.Error()
 		if strings.Contains(es, "not found") {
@@ -369,19 +376,56 @@ func (ctl *bandController) RespondInvite(c *gin.Context) {
 			JoinedAt:  time.Now(),
 		}
 
-		if persistErr := ctl.BandUC.CreateMember(&memberObj); persistErr != nil {
+		if persistErr := ctl.MemberUC.Create(&memberObj); persistErr != nil {
 			helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting the new band member!", persistErr.Error())
 			return
 		}
 	}
 
 	inviteResult.Status = updateInput.Status
-	if persistErr := ctl.BandUC.UpdateInvite(inviteResult); persistErr != nil {
+	if persistErr := ctl.BandRequestUC.Update(inviteResult); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting the band invite data!", persistErr.Error())
 		return
 	}
 
 	helpers.HTTPRes(c, http.StatusOK, "Invite successfully responded", nil)
+}
+
+// @Summary Transfer ownership to another user
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/bands/:id/transter/:member_id [patch]
+func (ctl *bandController) Transfer(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	bandResult, err := ctl.BandUC.FindById(id)
+	if err != nil {
+		es := err.Error()
+		if strings.Contains(es, "not found") {
+			helpers.HTTPRes(c, http.StatusNotFound, "Band not found", nil)
+			return
+		}
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	// Verify if user is a band admin
+	if user.ID != bandResult.OwnerID {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
 }
 
 // @Summary Updated band data endpoint
@@ -488,7 +532,7 @@ func (ctl *bandController) UpdateMember(c *gin.Context) {
 		return
 	}
 
-	memberResult, err := ctl.BandUC.FindMemberById(memberId)
+	memberResult, err := ctl.MemberUC.FindById(memberId)
 	if err != nil {
 		es := err.Error()
 		if strings.Contains(es, "not found") {
@@ -530,7 +574,7 @@ func (ctl *bandController) UpdateMember(c *gin.Context) {
 
 	// Updating member reference
 	memberResult.Role = updateInput.Role
-	if persistErr := ctl.BandUC.UpdateMember(memberResult); persistErr != nil {
+	if persistErr := ctl.MemberUC.Update(memberResult); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band member!", persistErr.Error())
 		return
 	}
@@ -575,7 +619,7 @@ func (ctl *bandController) ExpelMember(c *gin.Context) {
 		return
 	}
 
-	memberResult, err := ctl.BandUC.FindMemberById(memberId)
+	memberResult, err := ctl.MemberUC.FindById(memberId)
 	if err != nil {
 		es := err.Error()
 		if strings.Contains(es, "not found") {
@@ -593,7 +637,7 @@ func (ctl *bandController) ExpelMember(c *gin.Context) {
 	}
 
 	// Remove member from band
-	if persistErr := ctl.BandUC.RemoveMember(memberResult); persistErr != nil {
+	if persistErr := ctl.MemberUC.Remove(memberResult); persistErr != nil {
 		helpers.HTTPRes(c, http.StatusInternalServerError, "Error deleting band member!", persistErr.Error())
 		return
 	}

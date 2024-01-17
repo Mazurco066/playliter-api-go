@@ -89,13 +89,15 @@ func Run() {
 	/* ========= Setup usecases ========= */
 	accountService := accountusecase.NewAccountUseCase(accountRepo, hm)
 	authService := authusecase.NewAuthUseCase(configs.JWTSecret)
-	bandService := bandusecase.NewBandUseCase(bandRepo, bandRequestRepo, memberRepo)
+	bandService := bandusecase.NewBandUseCase(bandRepo)
+	bandRequestService := bandusecase.NewBandRequestUseCase(bandRequestRepo)
+	memberService := bandusecase.NewMemberUseCase(memberRepo)
 	concertService := concertusecase.NewConcertUseCase(concertRepo)
 	songService := songusecase.NewSongUseCase(songrepo)
 
 	/* ========= Setup controllers ========= */
 	accountController := accountcontroller.NewAccaccountController(accountService, authService)
-	bandController := bandcontroller.NewBandController(accountService, bandService)
+	bandController := bandcontroller.NewBandController(accountService, bandService, bandRequestService, memberService)
 	concertController := concertcontroller.NewConcertController(concertService)
 	songController := songcontroller.NewSongController(songService)
 
