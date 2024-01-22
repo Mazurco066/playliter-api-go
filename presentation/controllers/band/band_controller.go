@@ -2,6 +2,7 @@ package bandcontroller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -396,7 +397,7 @@ func (ctl *bandController) RespondInvite(c *gin.Context) {
 // @Success 200 {object} Response
 // @Failure 400 {object} Response
 // @Failure 500 {object} Response
-// @Router /api/bands/:id/transter/:member_id [patch]
+// @Router /api/bands/:id/transfer/:member_id [patch]
 func (ctl *bandController) Transfer(c *gin.Context) {
 	user := ctl.validateTokenData(c)
 	if user == nil {
@@ -405,6 +406,12 @@ func (ctl *bandController) Transfer(c *gin.Context) {
 	}
 
 	id, err := ctl.stringToUint(c.Param(("id")))
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	member_id, err := ctl.stringToUint(c.Param(("member_id")))
 	if err != nil {
 		helpers.HTTPRes(c, http.StatusBadRequest, err.Error(), nil)
 		return
@@ -426,6 +433,51 @@ func (ctl *bandController) Transfer(c *gin.Context) {
 		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
 		return
 	}
+
+	if !ctl.isBandMember(bandResult.Members, member_id) {
+		helpers.HTTPRes(c, http.StatusBadRequest, "The provided account is not a band member", nil)
+		return
+	}
+
+	// Delete band member
+	targetAccount, err := ctl.AccountUc.GetAccountById(member_id)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusNotFound, "User account not found", nil)
+		return
+	}
+
+	targetMember, err := ctl.findBandMember(bandResult.Members, member_id)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusBadRequest, "Band member not found", nil)
+		return
+	}
+	if persistErr := ctl.MemberUC.Remove(targetMember); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band member", nil)
+		return
+	}
+
+	// Save old owner as band member
+	newMember := band.Member{
+		BandID:    bandResult.ID,
+		Role:      "admin",
+		AccountID: user.ID,
+		JoinedAt:  time.Now(),
+	}
+
+	bandResult.OwnerID = targetAccount.ID
+	bandResult.Owner = *targetAccount
+	if persistErr := ctl.BandUC.Update(bandResult); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band", nil)
+		return
+	}
+
+	if persistErr := ctl.MemberUC.Create(&newMember); persistErr != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Error persisting band member", nil)
+		return
+	}
+
+	// Responding
+	helpers.HTTPRes(c, http.StatusOK, "Band ownership successfully transferred!", nil)
 }
 
 // @Summary Updated band data endpoint
@@ -659,6 +711,15 @@ func (ctl *bandController) validateTokenData(c *gin.Context) *account.Account {
 	}
 
 	return user
+}
+
+func (ctl *bandController) findBandMember(members []band.Member, accountID uint) (*band.Member, error) {
+	for _, member := range members {
+		if member.AccountID == accountID {
+			return &member, nil
+		}
+	}
+	return nil, fmt.Errorf("member not found")
 }
 
 func (ctl *bandController) isBandMember(members []band.Member, accountID uint) bool {

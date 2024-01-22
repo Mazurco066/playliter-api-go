@@ -129,6 +129,7 @@ func Run() {
 		bands.GET("/:id", bandController.Get)
 		bands.PATCH("/:id", bandController.Update)
 		bands.DELETE("/:id", bandController.Remove)
+		bands.PATCH("/:id/transfer/:member_id", bandController.Transfer)
 		bands.POST("/:id/invite/:account_id", bandController.Invite)
 		bands.PATCH("/:id/invite/:invite_id", bandController.RespondInvite)
 		bands.PATCH("/:id/member/:member_id", bandController.UpdateMember)
