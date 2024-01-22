@@ -135,6 +135,11 @@ func Run() {
 		bands.PATCH("/:id/member/:member_id", bandController.UpdateMember)
 		bands.DELETE(":id/member/:member_id", bandController.ExpelMember)
 	}
+	invites := api.Group("/invites")
+	invites.Use(middlewares.RequiredLoggedIn(configs.JWTSecret))
+	{
+		invites.GET("/", bandController.PendingInvites)
+	}
 
 	/* ========= App concert routes ========= */
 	concerts := api.Group("/concerts")

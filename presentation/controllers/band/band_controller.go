@@ -27,6 +27,7 @@ type BandController interface {
 	Get(*gin.Context)
 	Invite(*gin.Context)
 	List(*gin.Context)
+	PendingInvites(*gin.Context)
 	Remove(*gin.Context)
 	RespondInvite(*gin.Context)
 	Transfer(*gin.Context)
@@ -263,6 +264,47 @@ func (ctl *bandController) List(c *gin.Context) {
 	helpers.HTTPRes(c, http.StatusOK, "Bands successfully listed!", resultOutput)
 }
 
+// @Summary List account pending invites
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /api/invites [get]
+func (ctl *bandController) PendingInvites(c *gin.Context) {
+	user := ctl.validateTokenData(c)
+	if user == nil {
+		helpers.HTTPRes(c, http.StatusForbidden, "Forbidden", nil)
+		return
+	}
+
+	var paging commoninputs.PagingParams
+	if err := c.BindQuery(&paging); err != nil {
+		paging.Limit = 100
+		paging.Offset = 0
+	}
+
+	results, err := ctl.BandRequestUC.FindByAccount(user, &paging)
+	if err != nil {
+		helpers.HTTPRes(c, http.StatusInternalServerError, "Internal server error", nil)
+		return
+	}
+
+	var resultOutput []*bandoutputs.BandRequestOutput
+	for _, b := range results {
+		output := ctl.mapToBandRequestSimpleOutput(b)
+		resultOutput = append(resultOutput, output)
+	}
+
+	// Empty array if no results
+	if resultOutput == nil {
+		helpers.HTTPRes(c, http.StatusOK, "Pending invitations successfully listed!", []string{})
+		return
+	}
+
+	// Formatted array
+	helpers.HTTPRes(c, http.StatusOK, "Pending invitations successfully listed!", resultOutput)
+}
+
 // @Summary Delete band endpoint
 // @Produce json
 // @Success 200 {object} Response
@@ -477,7 +519,8 @@ func (ctl *bandController) Transfer(c *gin.Context) {
 	}
 
 	// Responding
-	helpers.HTTPRes(c, http.StatusOK, "Band ownership successfully transferred!", nil)
+	bandOutput := ctl.mapToBandOutput(bandResult)
+	helpers.HTTPRes(c, http.StatusOK, "Band ownership successfully transferred!", bandOutput)
 }
 
 // @Summary Updated band data endpoint
@@ -785,6 +828,29 @@ func (ctl *bandController) mapToBandRequestOutput(b *band.BandRequest) *bandoutp
 				Role:         b.Band.Owner.Role,
 				IsActive:     b.Band.Owner.IsActive,
 			},
+		},
+		Invited: &accountoutputs.AccountOutput{
+			ID:           b.Invited.ID,
+			Name:         b.Invited.Name,
+			Username:     b.Invited.Username,
+			Email:        b.Invited.Email,
+			Avatar:       *b.Invited.Avatar,
+			IsEmailValid: b.Invited.IsEmailValid,
+			Role:         b.Invited.Role,
+			IsActive:     b.Invited.IsActive,
+		},
+		Status: b.Status,
+	}
+}
+
+func (ctl *bandController) mapToBandRequestSimpleOutput(b *band.BandRequest) *bandoutputs.BandRequestOutput {
+	return &bandoutputs.BandRequestOutput{
+		ID: b.ID,
+		Band: &bandoutputs.BandOutput{
+			ID:          b.Band.ID,
+			Logo:        *b.Band.Logo,
+			Title:       b.Band.Title,
+			Description: b.Band.Description,
 		},
 		Invited: &accountoutputs.AccountOutput{
 			ID:           b.Invited.ID,
